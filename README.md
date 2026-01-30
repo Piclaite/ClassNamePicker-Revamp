@@ -8,6 +8,8 @@ ClassNamePicker-Revamp基于ClassNamePicker更改而成，至少我自己用的�
 </div>
 
 > [!TIP]
+> 第一次用github，若有问题请指出，十分感谢
+> 
 > 使用了ai
 > 
 > 多半不会更新，除非有严重的bug

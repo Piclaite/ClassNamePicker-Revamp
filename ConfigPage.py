@@ -158,8 +158,8 @@ class ConfigWindow(QtWidgets.QMainWindow, Ui_ConfigMainWindow):
         QtWidgets.QMessageBox.information(self, "提示", msg)
     
     def _save_name_changes(self):
-        """保存多音字"""
-        changes = {f'{c}{i}': getattr(self, f'{c}{i}').text() 
+        """保存多音字（键名与加载/播报替换逻辑保持一致）"""
+        changes = {f'speak_change_{c}{i}': getattr(self, f'{c}{i}').text().strip()
                   for c in 'abc' for i in (1, 2)}
         ConfigManager.save_name_changes(changes)
 
@@ -251,7 +251,21 @@ class ConfigWindow(QtWidgets.QMainWindow, Ui_ConfigMainWindow):
         if file_path:
             self.image_path_edit.setText(file_path)
 
+    '''def _quick_fix_name_file(self,type):'''
+    
+    '''def check_update(self):
+        """精简：检查更新逻辑"""
+        try:
+            response = request.get("https://api.github.com/repos/Chengzi600/ClassNamePicker/releases/latest")
+            data = response.json()
+            latest, info = data['tag_name'], data['body']
+        except Exception as e:
+            latest, info = '检测失败', str(e)
+        
+        if QtWidgets.QMessageBox.question(self, '检查更新', f'最新版本: {latest}\n{info}\n\n打开GitHub？'):
+            webbrowser.open("https://github.com/Chengzi600/ClassNamePicker/releases")'''
+
     @staticmethod
     def github_menu():
         import webbrowser
-        webbrowser.open("https://github.com/Piclaite/ClassNamePicker-Revamp/releases")
+        webbrowser.open("https://github.com/Chengzi600/ClassNamePicker/releases")

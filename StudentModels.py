@@ -1,3 +1,4 @@
+# StudentModels.py
 from dataclasses import dataclass
 from enum import Enum
 from typing import Set, List
@@ -12,17 +13,16 @@ class Gender(Enum):
     
 @dataclass(frozen=True)
 class Student:
-    original_name: str
-    display_name: str
+    name: str
     gender: Gender
     
-    __slots__ = ('original_name', 'display_name', 'gender')  # 保持内存优化
+    __slots__ = ('name', 'gender')  # 保持内存优化
 
     def __hash__(self):
-        return hash(self.original_name)
+        return hash(self.name)
     
     def __eq__(self, other):
-        return isinstance(other, Student) and self.original_name == other.original_name
+        return isinstance(other, Student) and self.name == other.name
 
 class StudentPool:
     """学生池（位图存储状态）"""
@@ -46,14 +46,14 @@ class StudentPool:
 
         # 1. 唯一存储：学生列表（有序，索引即ID）
         self._students = all_students
-        self._name_to_idx = {s.original_name: idx for idx, s in enumerate(all_students)}
+        self._name_to_idx = {s.name: idx for idx, s in enumerate(all_students)}
         
         # 2. 女生位图（核心优化）
         self._female_bitmap = bitarray(total)
         self._female_bitmap.setall(0)  # 默认全为男生
         for s in female_students:
-            if s.original_name in self._name_to_idx:
-                self._female_bitmap[self._name_to_idx[s.original_name]] = 1
+            if s.name in self._name_to_idx:
+                self._female_bitmap[self._name_to_idx[s.name]] = 1
         
         # 3. 位图状态
         # 使用bitarray
@@ -110,7 +110,7 @@ class StudentPool:
             self._recent_queue.append(picked_idx)
             self._recent_bitmap[picked_idx] = True
         
-        return self._students[picked_idx].display_name
+        return self._students[picked_idx].name
 
     def reset(self, gender: Gender = Gender.UNKNOWN):
         """重置名单（位图批量操作）"""
@@ -131,11 +131,11 @@ class StudentPool:
     
     def get_available_names(self) -> Set[str]:
         """获取可用名字集合（用于保存）"""
-        return {self._students[i].original_name for i in range(len(self._students)) if self._bit_available[i]}
+        return {self._students[i].name for i in range(len(self._students)) if self._bit_available[i]}
 
     def get_picked_names(self) -> Set[str]:
         """获取已抽取名字集合（用于重建）"""
-        return {self._students[i].original_name for i in range(len(self._students)) if self._bit_picked[i]}
+        return {self._students[i].name for i in range(len(self._students)) if self._bit_picked[i]}
 
     def restore_available_names(self, names: Set[str]):
         """从历史名单恢复位图状态（配置加载）"""
@@ -150,6 +150,22 @@ class StudentPool:
                 if idx is not None:
                     self._bit_available[idx] = True
                     self._bit_picked[idx] = False
+
+    def restore_picked_names(self, names: Set[str]):
+        """从已抽取名单恢复位图状态（与 restore_available_names 逻辑相反）"""
+        # 先设为全可用（相当于没有任何抽取记录）
+        self._bit_available.setall(True)
+        self._bit_picked.setall(False)
+        
+        # 将传入的已抽取名单设为已抽取状态（不可用）
+        if names:
+            for name in names:
+                idx = self._name_to_idx.get(name)
+                if idx is not None:
+                    self._bit_available[idx] = False
+                    self._bit_picked[idx] = True
+        
+        # 注意：防重复队列保持为空是合理的，因为历史记录不应影响新的"最近抽取"逻辑
 
     ### ===== 数据访问接口 =====
     

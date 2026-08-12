@@ -54,7 +54,7 @@ class ConfigManager:
     KEY_SHOW_FLOATING = "show_floating"
     KEY_FLOATING_AUTOSTICK = "floating_autostick"
     KEY_DOUBLE_FLOATING_WINDOW = "double_floating_window"
-    KEY_SAVED_AVAILABLE_NAMES = "saved_available_names"
+    KEY_SAVED_PICKED_NAMES = "saved_picked_names"
     KEY_PICKED_COUNT = "picked_count"
     KEY_GENDER_FILTER = "gender_filter"
     KEY_RECITE_MODE = "recite_mode"      # 背书模式（计时器）
@@ -83,7 +83,7 @@ class ConfigManager:
         KEY_DOUBLE_FLOATING_WINDOW: False,
         KEY_FLOATING_IMAGE: None,  # None表示使用默认文字
         KEY_WINDOW_GEOMETRY_QT: None,
-        KEY_SAVED_AVAILABLE_NAMES: [],
+        KEY_SAVED_PICKED_NAMES: [],
         KEY_PICKED_COUNT: 0,
         KEY_GENDER_FILTER: 'unknown',
     }
@@ -106,7 +106,7 @@ class ConfigManager:
         
         # 创建多音字配置
         if not cls.NAME_CHANGES_FILE.exists():
-            cls.save_name_changes({f'speak_change_{c}': '' for c in 'abc'})
+            cls.save_name_changes({f'speak_change_{c}{i}': '' for c in 'abc' for i in (1, 2)})
     
     @classmethod
     def load_cached(cls):
@@ -173,11 +173,24 @@ class ConfigManager:
     
     @classmethod
     def load_name_changes(cls):
-        """加载多音字配置"""
+        """加载多音字配置（自动迁移旧版键名，如 a1 → speak_change_a1）"""
         try:
-            return json.loads(cls.NAME_CHANGES_FILE.read_text(encoding='utf-8'))
+            data = json.loads(cls.NAME_CHANGES_FILE.read_text(encoding='utf-8'))
         except Exception:
-            return {f'speak_change_{c}': '' for c in 'abc'}
+            data = {}
+
+        # 键名迁移：兼容历史版本保存的 a1/a2/b1... 格式
+        migrated = False
+        for c in 'abc':
+            for i in (1, 2):
+                new_key = f'speak_change_{c}{i}'
+                if new_key not in data and f'{c}{i}' in data:
+                    data[new_key] = data[f'{c}{i}']
+                    migrated = True
+        if migrated:
+            cls.save_name_changes(data)
+
+        return data
         
 
     @classmethod

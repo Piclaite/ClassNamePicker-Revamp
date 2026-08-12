@@ -57,12 +57,15 @@ class FloatingWindow(QWidget):
         return self._is_snapped
 
     def showEvent(self, event):
-        """显示时自动初始化位置"""
+        """显示时自动初始化位置（确保可操作部分在屏幕内）"""
         super().showEvent(event)
         if self._autostick:
             # **关键修改：单悬浮窗每次都重计算，双悬浮窗仅首次**
             if self._side is None or not self._is_snapped:
                 QTimer.singleShot(30, self.initialize_position)
+        else:
+            # 非贴边模式：不自动吸附，但确保窗口显示在屏幕内
+            QTimer.singleShot(30, self._ensure_on_screen)
 
     def set_parent_geometry(self, geometry):
         """在父窗口隐藏前缓存其几何信息"""
@@ -103,17 +106,23 @@ class FloatingWindow(QWidget):
             self._pixmap = QPixmap()  # 空图片
             
     def initialize_position(self):
-        """基于主窗口位置初始化到屏幕边缘"""
+        """基于主窗口位置初始化到屏幕边缘（主窗口中心在屏幕外时自动兜底）"""
         # 判断使用实时几何还是缓存几何
+        parent_geo = None
         if self.parent() and self.parent().isVisible():
             parent_geo = self.parent().geometry()
-            center_x = parent_geo.center().x()
-            screen = QApplication.screenAt(parent_geo.center()).availableGeometry()
         elif self._parent_geometry_cache:
-            # 使用缓存的几何信息
             parent_geo = self._parent_geometry_cache
+
+        if parent_geo is not None:
             center_x = parent_geo.center().x()
-            screen = QApplication.screenAt(parent_geo.center()).availableGeometry()
+            # 主窗口可能大部分被拖出屏幕：screenAt 对屏幕外坐标返回 None，需逐级兜底
+            screen = QApplication.screenAt(parent_geo.center())
+            if screen is None:
+                screen = (QApplication.screenAt(parent_geo.topLeft())
+                          or QApplication.screenAt(parent_geo.bottomRight())
+                          or QApplication.primaryScreen())
+            screen = screen.availableGeometry()
         else:
             # fallback: 使用屏幕中心
             screen = QApplication.primaryScreen().availableGeometry()
@@ -136,6 +145,44 @@ class FloatingWindow(QWidget):
         target_y = screen.center().y() - self.height() // 2
         self.move(target_x, target_y)
         self._set_snapped(True)
+        # 确保可操作部分在屏幕内（贴边模式保持半出屏幕设计，不受影响）
+        self._ensure_on_screen()
+
+    def _ensure_on_screen(self):
+        """确保悬浮窗可操作部分显示在屏幕内。
+
+        - 贴边模式（_is_snapped）：允许半出屏幕（贴边特性），至少露出 1/4
+        - 非贴边模式：整个窗口拉回屏幕内
+        """
+        try:
+            geo = self.geometry()
+            screen = QApplication.screenAt(geo.center())
+            if screen is None:
+                screen = QApplication.screenAt(geo.topLeft())
+            if screen is None:
+                screen = QApplication.primaryScreen()
+            avail = screen.availableGeometry()
+        except Exception:
+            return  # 兜底失败时不调整，避免干扰
+
+        min_visible_x = self.width() // 4 if self._is_snapped else self.width()
+        min_visible_y = self.height() // 4 if self._is_snapped else self.height()
+
+        x, y = self.x(), self.y()
+        # x 方向约束：至少 min_visible_x 像素可见
+        if x + self.width() < avail.left() + min_visible_x:
+            x = avail.left() + min_visible_x - self.width()
+        elif x > avail.right() - min_visible_x + 1:
+            x = avail.right() - min_visible_x + 1
+        # y 方向约束：至少 min_visible_y 像素可见
+        if y + self.height() < avail.top() + min_visible_y:
+            y = avail.top() + min_visible_y - self.height()
+        elif y > avail.bottom() - min_visible_y + 1:
+            y = avail.bottom() - min_visible_y + 1
+
+        if (x, y) != (self.x(), self.y()):
+            self.move(x, y)
+            print(f"[FLOAT] 已调整到屏幕内: ({x}, {y})")
     
     def _set_snapped(self, snapped: bool):
         """内部状态设置"""
@@ -240,7 +287,9 @@ class FloatingWindow(QWidget):
         if not self._autostick and not final:
             return
         
-        screen = QApplication.primaryScreen().availableGeometry()
+        # 使用窗口所在屏幕（多显示器下更准确），屏幕外则回退主屏
+        screen = QApplication.screenAt(self.geometry().center()) or QApplication.primaryScreen()
+        screen = screen.availableGeometry()
         center = self.geometry().center()
         
         distances = {

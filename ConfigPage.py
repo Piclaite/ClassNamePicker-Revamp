@@ -256,16 +256,16 @@ class ConfigWindow(QtWidgets.QMainWindow, Ui_ConfigMainWindow):
     '''def check_update(self):
         """精简：检查更新逻辑"""
         try:
-            response = request.get("https://api.github.com/repos/Chengzi600/ClassNamePicker/releases/latest")
+            response = request.get("https://api.github.com/repos/Piclaite/ClassNamePicker-Revamp/releases/latest")
             data = response.json()
             latest, info = data['tag_name'], data['body']
         except Exception as e:
             latest, info = '检测失败', str(e)
         
         if QtWidgets.QMessageBox.question(self, '检查更新', f'最新版本: {latest}\n{info}\n\n打开GitHub？'):
-            webbrowser.open("https://github.com/Chengzi600/ClassNamePicker/releases")'''
+            webbrowser.open("https://github.com/Piclaite/ClassNamePicker-Revamp/releases")'''
 
     @staticmethod
     def github_menu():
         import webbrowser
-        webbrowser.open("https://github.com/Chengzi600/ClassNamePicker/releases")
+        webbrowser.open("https://github.com/Piclaite/ClassNamePicker-Revamp/releases")
